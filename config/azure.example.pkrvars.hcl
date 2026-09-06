@@ -1,0 +1,11 @@
+subscription_id                = "00000000-0000-0000-0000-000000000000"
+location                       = "uksouth"
+build_resource_group           = "rg-image-build"
+gallery_resource_group         = "rg-image-gallery"
+gallery_name                   = "company_images"
+image_definition_name          = "cis-ubuntu-2404-runner"
+image_version                  = "1.0.0"
+virtual_network_name           = "vnet-platform"
+virtual_network_resource_group = "rg-network"
+subnet_name                    = "snet-image-build"
+# Source and purchase-plan variables are supplied by artifacts/source-24.04.pkrvars.json.

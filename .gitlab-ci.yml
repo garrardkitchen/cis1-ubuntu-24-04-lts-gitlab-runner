@@ -1,0 +1,55 @@
+stages: [validate, build]
+
+# Existing, dedicated Linux runner with .NET 10 SDK, Packer >=1.14,
+# Terraform >=1.9 and Azure CLI, plus a route to the private build subnet.
+# Do not run untrusted merge requests on the privileged image-build runner.
+default:
+  tags: [image-factory]
+
+validate:
+  stage: validate
+  script:
+    - dotnet run --project tests/ImageFactory.Tests -c Release
+    - dotnet build tools/Factory -c Release
+    - packer fmt -check packer
+    - packer init packer
+    - packer validate -syntax-only packer
+    - terraform -chdir=infra/terraform fmt -check
+    - terraform -chdir=infra/terraform init -backend=false
+    - terraform -chdir=infra/terraform validate
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+
+build-image:
+  stage: build
+  needs: [validate]
+  resource_group: cis-ubuntu-image-build
+  timeout: 4h
+  id_tokens:
+    AZURE_ID_TOKEN:
+      aud: api://AzureADTokenExchange
+  variables:
+    PKR_VAR_use_azure_cli_auth: "false"
+  before_script:
+    - export PKR_VAR_client_jwt="$AZURE_ID_TOKEN"
+    - export PKR_VAR_client_id="$AZURE_CLIENT_ID"
+    - export PKR_VAR_tenant_id="$AZURE_TENANT_ID"
+    - export AZURE_CONFIG_DIR="$CI_PROJECT_DIR/artifacts/azure-cli"
+    - az login --service-principal --username "$AZURE_CLIENT_ID" --tenant "$AZURE_TENANT_ID" --federated-token "$AZURE_ID_TOKEN" --output none
+    - az account set --subscription "$AZURE_SUBSCRIPTION_ID"
+  script:
+    - dotnet run --project tools/Factory -- publish
+    # Protected File variables containing reviewed environment and pinned source JSON.
+    - dotnet run --project tools/Factory -- build "$AZURE_PACKER_VARS" "$CIS_SOURCE_VARS"
+  after_script:
+    - rm -rf "$CI_PROJECT_DIR/artifacts/azure-cli"
+  artifacts:
+    when: always
+    paths:
+      - artifacts/packages.tsv
+      - artifacts/resolved-package-pins.json
+      - artifacts/packer-manifest.json
+    expire_in: 30 days
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+      when: manual
