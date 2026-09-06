@@ -20,6 +20,115 @@ Datadog, Runner and Defender services are disabled until configured on each depl
 
 No Datadog keys, runner tokens or Defender onboarding packages belong in Git, Packer variables, Terraform state or the golden image. This is a deliberate reusable, tenant-neutral image design; Microsoft also supports pre-onboarded golden images, but that is not implemented here.
 
+## How the image is built
+
+The starting point is **CIS's existing hardened Ubuntu image from Azure Marketplace**. Packer customises a temporary VM created from that image and captures the result as a new version in your Azure Compute Gallery.
+
+1. **Prepare Azure with Terraform.** Create the build resource group, gallery, image definitions, managed identity and scoped permissions. The VNet and build subnet must already exist.
+2. **Select the CIS source.** Resolve an explicit regional Marketplace image version and its purchase plan, then review and accept the terms in the build subscription.
+3. **Create a temporary VM with Packer.** The existing workstation or CI runner needs Azure authentication and SSH connectivity to the VM's private IP. The VM needs outbound access to the package repositories.
+4. **Install and verify the software.** Packer uploads the Bash scripts, which install Docker, Compose, GitLab Runner, Datadog Agent and Defender. Package and CLI checks run, and the package inventory is exported.
+5. **Seal and capture the VM.** The scripts remove machine-specific identities and deprovision the VM. Packer publishes a generalised image version, then cleans up its temporary build resources after a successful build. The Terraform-managed gallery and build resource group remain; inspect leftovers after failures.
+6. **Test a deployed candidate.** Deploy from the exact gallery version, enrol the agents, reboot, run a real GitLab job and reassess CIS compliance before approving that version for rollout.
+
+### Process and dependencies
+
+Solid arrows show the build and release sequence. Dotted arrows show prerequisites or supporting outputs. Colour separates infrastructure, build steps, image storage and release checks; labels carry the same meaning.
+
+```mermaid
+flowchart TD
+    TF["Terraform: gallery, definitions and RBAC"]
+    HOST["Existing workstation or CI runner"]
+    CIS["CIS Marketplace image: pinned version"]
+    NET["Existing private subnet, SSH and egress"]
+
+    subgraph BUILD["1 · Packer image build"]
+        VM["Create temporary Azure VM"]
+        INSTALL["Bash: install and verify software"]
+        SEAL["Clean identities and generalise"]
+        VM --> INSTALL --> SEAL
+    end
+
+    REPOS["Signed vendor APT repositories"]
+    GALLERY[("Azure Compute Gallery: image version")]
+    FILES["Build artifacts: inventory and manifest"]
+
+    subgraph RELEASE["2 · Candidate checks and rollout — operator steps"]
+        TEST["Deploy isolated VM from exact version"]
+        CHECK["Enrol agents, reboot and assess CIS"]
+        APPROVE["Approve version for rollout"]
+        TEST --> CHECK --> APPROVE
+    end
+
+    SECRETS["Per-VM credentials and Linux onboarding ZIP"]
+
+    TF -.-> VM
+    TF -.-> GALLERY
+    HOST --> VM
+    CIS -.-> VM
+    NET -.-> VM
+    REPOS -.-> INSTALL
+    SEAL --> GALLERY
+    INSTALL -.-> FILES
+    GALLERY -.-> FILES
+    GALLERY --> TEST
+    SECRETS -.-> CHECK
+
+    classDef infra fill:#ede9fe,stroke:#7c3aed,color:#2e1065,stroke-width:2px
+    classDef dependency fill:#f1f5f9,stroke:#64748b,color:#0f172a
+    classDef build fill:#dbeafe,stroke:#2563eb,color:#172554,stroke-width:2px
+    classDef output fill:#d1fae5,stroke:#059669,color:#064e3b,stroke-width:2px
+    classDef release fill:#fef3c7,stroke:#d97706,color:#78350f,stroke-width:2px
+    class TF infra
+    class HOST,CIS,NET,REPOS,SECRETS dependency
+    class VM,INSTALL,SEAL build
+    class GALLERY,FILES output
+    class TEST,CHECK,APPROVE release
+    style BUILD fill:#eff6ff,stroke:#93c5fd,color:#172554
+    style RELEASE fill:#fffbeb,stroke:#fcd34d,color:#78350f
+```
+
+> [!IMPORTANT]
+> Agent credentials and the Defender onboarding ZIP are supplied **after deployment**, not during image capture. The candidate deployment, enrolment and release checks are operator steps; the current pipeline does not automate them.
+
+## Where the finished image is stored
+
+The VM image is stored in **Azure Compute Gallery in your subscription**. The destination comes from the Packer variables in [the environment example](config/azure.example.pkrvars.hcl), matched to the Terraform outputs.
+
+| Destination setting | Example value |
+|---|---|
+| Subscription | Your configured Azure subscription ID |
+| Resource group | `rg-image-gallery` |
+| Azure Compute Gallery | `company_images` |
+| Image definition | `cis-ubuntu-2404-runner` |
+| Image version | `1.0.0` |
+| Target region | `uksouth` |
+| Replica storage | `Standard_LRS`, one replica in the target region |
+
+In the Azure portal, open **Azure Compute Galleries → company_images → cis-ubuntu-2404-runner → Versions → 1.0.0**. These are example names; substitute the values configured for your environment.
+
+The image-version resource ID has this structure:
+
+`/subscriptions/<subscription-id>/resourceGroups/rg-image-gallery/providers/Microsoft.Compute/galleries/company_images/images/cis-ubuntu-2404-runner/versions/1.0.0`
+
+Use that exact version ID when deploying candidate VMs. Keep the source Marketplace purchase plan in the VM deployment configuration.
+
+The build host also receives small files under `artifacts/`; these are build records, not a downloadable VM image:
+
+| File | Contents |
+|---|---|
+| `packages.tsv` | Installed package inventory |
+| `resolved-package-pins.json` | Resolved versions of the requested packages |
+| `packer-manifest.json` | Packer build result and source metadata |
+
+The optional GitLab build job retains these files as CI artifacts for 30 days. The image version remains in Azure independently of that artifact retention period.
+
+> [!TIP]
+> Each published version is initially **excluded from `latest`**. Test and approve an explicit version before rollout. Installing additional software changes the CIS baseline, so the derived image needs its own compliance assessment.
+
+> [!NOTE]
+> Repository validation has passed, but an Azure image build and agent onboarding have not yet been performed. Pushing this repository runs validation; it does not create the image automatically.
+
 ## Repository layout
 
 | Path | Purpose |
