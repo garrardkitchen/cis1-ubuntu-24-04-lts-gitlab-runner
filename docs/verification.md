@@ -1,20 +1,17 @@
 # Verification status
 
-Created 2026-09-06.
+The Bash refactor removes the C# projects, compiled provisioner and .NET SDK requirement. It preserves Terraform infrastructure, Packer image builds and post-deployment enrolment.
 
-Local environment checks cover JSON/YAML/XML structure, referenced local files, tracked-file hygiene and manual review against vendor documentation and the Packer Azure plugin's actual configuration schema.
+Local checks cover Bash syntax, security/input tests, JSON/YAML structure and tracked-file hygiene. GitHub Actions runs the same tests plus ShellCheck, Packer validation and Terraform validation/format checks. Consult the Actions result for this branch; the previous main-branch C# results do not validate these scripts.
 
-The authoring environment has no .NET SDK, Packer, Terraform or Azure CLI. Attempts to obtain toolchains were blocked by network approval. Therefore no local compilation, native template validation or Azure image build is claimed.
+The Terraform federation resource uses AzureRM 5.x `user_assigned_identity_id`; the earlier `parent_id` and `resource_group_name` arguments were invalid with that provider.
 
-The GitHub Actions workflow supplies compilation/test and native-template gates. GitHub write access was restored after reauthentication. Consult the Actions result for the current commit; these checks do not deploy infrastructure.
+No Azure image build or vendor enrolment has been run. Still required:
 
-Still required in the target environment:
+- Resolve a regional CIS source and confirm Marketplace terms.
+- Apply Terraform and test RBAC/private networking with Packer.
+- Build each OS variant that will be used.
+- Boot/reboot a candidate and complete a CIS assessment.
+- Inspect the Defender Linux package, enrol the three agents and run a GitLab job.
 
-- Validate actual regional source image/version and Marketplace terms.
-- Apply Terraform and test scoped RBAC/private networking with Packer.
-- Build both requested OS variants if both will be used.
-- Boot/reboot candidate VMs and run a CIS assessment.
-- Supply and inspect the Defender Linux onboarding package.
-- Configure and verify Datadog, GitLab Runner and Defender on a candidate.
-
-No Azure resources or enrolled vendor devices were created during repository preparation.
+Passing script/template checks does not establish image compliance or operational readiness.

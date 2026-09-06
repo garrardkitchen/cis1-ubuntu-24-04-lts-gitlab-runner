@@ -1,5 +1,3 @@
-**/bin/
-**/obj/
 artifacts/
 .packer.d/
 packer_cache/
@@ -12,8 +10,6 @@ packer_cache/
 *.tfvars.json
 !*.example.tfvars
 .terraform/
-*.bicepparam
-!*.example.bicepparam
 secrets/
 *.zip
 *.pem

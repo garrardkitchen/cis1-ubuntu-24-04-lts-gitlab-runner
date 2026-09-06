@@ -25,7 +25,7 @@ variable "additional_build_principal_ids" {
 }
 variable "gitlab_federation" {
   description = "Optional GitLab OIDC trust, scoped to one project and branch."
-  type        = object({
+  type = object({
     issuer  = string
     subject = string
   })
@@ -33,7 +33,7 @@ variable "gitlab_federation" {
 }
 variable "images" {
   description = "Gallery definitions. Copy the purchase plan from Factory resolve output; do not invent it."
-  type        = map(object({
+  type = map(object({
     ubuntu_version = string
     plan_name      = string
     plan_product   = string
@@ -45,7 +45,7 @@ variable "images" {
   }
 }
 variable "tags" {
-  type    = map(string)
+  type = map(string)
   default = {
     workload  = "image-factory"
     managedBy = "terraform"

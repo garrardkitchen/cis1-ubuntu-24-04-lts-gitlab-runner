@@ -2,7 +2,7 @@
 
 ## GitHub validation
 
-The GitHub workflow runs on pushes to main and pull requests with `contents: read`. It compiles C#, runs the executable tests, publishes the Linux provisioner, validates the Packer template using synthetic values and validates Terraform with no backend. It never performs an Azure plan/apply or image build. No secrets are needed.
+The GitHub workflow runs on pushes to main, refactor branches and pull requests with `contents: read`. It checks Bash syntax, runs security/input tests and ShellCheck, validates the Packer template using synthetic values and validates Terraform with no backend. It never performs an Azure plan/apply or image build. No secrets are needed.
 
 ## Optional GitLab image build
 
@@ -24,6 +24,6 @@ Configure these protected GitLab CI variables:
 
 The source is deliberately not re-resolved to `latest` in the build job. The Azure CLI login checks terms; Packer authenticates with the GitLab OIDC token. No client secret is stored. Ensure Marketplace terms were accepted beforehand by an authorised operator and that the selected subscription matches the variables.
 
-Run the manual `build-image` job. It serializes builds against the shared build resource group and publishes only the package inventory and Packer manifest as CI artifacts. It excludes Azure CLI token cache and provisioner binaries from artifacts.
+Run the manual `build-image` job. It serializes builds against the shared build resource group and publishes only the package inventory and Packer manifest as CI artifacts. It excludes Azure CLI token cache from artifacts.
 
 Increase `image_version` for every successful publication. Keep separate environment/source files for 22.04 and 24.04 and separate package pin files when pinning. The pipeline does not deploy candidate VMs or run a CIS scanner yet; complete those release gates before using the image in production.

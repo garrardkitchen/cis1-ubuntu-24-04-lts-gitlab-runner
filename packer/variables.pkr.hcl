@@ -14,7 +14,7 @@ variable "source_image_sku" {
   type = string
   validation {
     condition     = contains(["cis-ubuntulinux2404-l1-gen2", "cis-ubuntulinux2204-l1-gen2"], var.source_image_sku)
-    error_message = "Select the CIS Ubuntu 24.04 or 22.04 Level 1 Gen2 SKU; verify regional availability with Factory resolve."
+    error_message = "Select the CIS Ubuntu 24.04 or 22.04 Level 1 Gen2 SKU; verify regional availability with scripts/factory.sh resolve."
   }
 }
 variable "source_image_version" {
@@ -40,7 +40,7 @@ variable "vm_size" {
 }
 variable "provisioner_directory" {
   type    = string
-  default = "artifacts/provisioner"
+  default = "scripts"
 }
 variable "package_pins_file" {
   type    = string

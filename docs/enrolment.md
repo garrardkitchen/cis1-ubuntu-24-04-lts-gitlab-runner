@@ -1,58 +1,44 @@
 # Configure each deployed VM
 
-Keep the VM isolated until all required services are enrolled and healthy. Run these steps on a VM created from the gallery image, never during Packer capture.
+Keep the VM isolated until required services are enrolled and healthy. These steps run on a deployed VM, never during image capture.
 
-Deliver inputs using your approved secret-management path, such as a deployment identity retrieving Key Vault secrets. Store temporary files under a root-owned directory on `/run` with mode `0700`, and make individual files mode `0600`. The C# commands refuse group/world-readable input files and symbolic links. Remove temporary inputs after successful setup; do not commit them or log their contents.
-
-The current repository supplies commands for enrolment. It does **not** yet provide a Key Vault fetcher, VM deployment module or automated first-boot service.
+Deliver inputs through your approved secret-management path, such as a deployment identity retrieving Key Vault secrets. Use a root-owned directory under `/run` with mode `0700` and input files mode `0600`. The helpers reject symlinks, other owners and group/world access. Do not enable shell tracing. Remove temporary inputs after successful setup. This repository does not supply a Key Vault fetcher, VM deployment module or first-boot service.
 
 ## Defender for Endpoint
 
-From the Defender portal select **Settings > Endpoints > Device management > Onboarding > Linux Server > Local Script**. A ZIP with `WindowsDefender` in its filename can be correct. The contents must include exactly one `MicrosoftDefenderATPOnboardingLinuxServer.py`.
+Download **Linux Server / Local Script** from Settings > Endpoints > Device management > Onboarding in the Defender portal. The ZIP must contain exactly one `MicrosoftDefenderATPOnboardingLinuxServer.py` at its root. The proposed `GatewayWindowsDefenderATPOnboardingPackage.zip` has not been provided or inspected; its filename alone cannot establish compatibility.
 
-The proposed `GatewayWindowsDefenderATPOnboardingPackage.zip` has not yet been provided or inspected. A Windows-only or gateway-specific package without the Linux script will be rejected. The helper reads only that entry into a private directory and executes Microsoft's script unchanged using Python 3. Python is a vendor prerequisite; our provisioning implementation remains C#.
+Run `sudo bash /opt/image-factory/enrol.sh defender /run/image-secrets/defender.zip`.
 
-Run `sudo /opt/image-factory/ImageProvisioner onboard-mde /run/image-secrets/defender.zip`.
+The helper streams only the selected script into a private directory, limits its size, runs Microsoft's script unchanged with Python 3, and removes the temporary copy. Python is used only for the vendor's onboarding script. Windows-only, nested or duplicate script entries are rejected.
 
-The command enables Defender, runs onboarding, restarts it and checks for an organisation identifier. After definition downloads complete, check `mdatp health --field healthy`, `mdatp health --field definitions_status`, and `mdatp health --field real_time_protection_enabled`; confirm the device in your Defender portal. Successful script execution alone is not the release gate. Apply your approved Defender policy and confirm the required licensing and outbound connectivity.
+After definitions download, check `mdatp health --field healthy`, `mdatp health --field definitions_status` and `mdatp health --field real_time_protection_enabled`. Confirm portal arrival and apply your approved policy. A returned organisation ID alone does not prove protection.
 
 ## Datadog
 
-Create a private JSON input with `ApiKey` and `Site`. This C# example shows the schema using an already securely obtained key; it is not a secret-fetch implementation:
+Supply a private JSON object with string fields `ApiKey` (your 32-character API key) and `Site` (for example, `datadoghq.eu`). Run `sudo bash /opt/image-factory/enrol.sh datadog /run/image-secrets/datadog.json`.
 
-```csharp
-var settings = new { ApiKey = apiKeyFromYourSecretProvider, Site = "datadoghq.eu" };
-```
-
-Run `sudo /opt/image-factory/ImageProvisioner configure-datadog /run/image-secrets/datadog.json`.
-
-It writes a root-owned, `dd-agent`-readable config and starts the agent. Confirm `datadog-agent status` and host arrival in the correct Datadog site. This enables normal host monitoring; Docker socket access, container collection, APM and security monitoring need separate reviewed configuration.
+The helper writes a root-owned, group-readable `dd-agent` config and restarts the service. Confirm `datadog-agent status` and host arrival. Docker collection, APM and security monitoring require separate reviewed configuration.
 
 ## GitLab Runner
 
-Create the runner in GitLab first. Set server-side project/group scope, protected status, tags and untagged-job policy. Obtain its **runner authentication token** (`glrt-`), not a legacy registration token.
+Create the runner in GitLab first; set its scope, protected status, tags and untagged-job policy. Use a `glrt-` runner authentication token.
 
-The private JSON input contains `Url`, `AuthenticationToken`, `DockerImage` and `Name`:
+Supply a private JSON object with these string fields:
 
-```csharp
-var settings = new
-{
-    Url = "https://gitlab.example.com",
-    AuthenticationToken = runnerTokenFromYourSecretProvider,
-    DockerImage = approvedImageWithSha256Digest,
-    Name = Environment.MachineName
-};
-```
+| Field | Value |
+|---|---|
+| `Url` | HTTPS GitLab URL without credentials, query or fragment |
+| `AuthenticationToken` | Runner authentication token |
+| `DockerImage` | Approved image reference ending in `@sha256:` and its 64-character digest |
+| `Name` | Unique VM name, using letters, numbers, dot, underscore or hyphen |
 
-Run `sudo /opt/image-factory/ImageProvisioner register-runner /run/image-secrets/runner.json`.
+Run `sudo bash /opt/image-factory/enrol.sh runner /run/image-secrets/runner.json`.
 
-The helper passes credentials through the child process environment and suppresses registration output. It configures the Docker executor without privileged mode or a host Docker-socket mount inside job containers, then checks registration. It refuses duplicate registration and requires the default job image to be pinned by digest.
+Credentials pass through the child environment, not command arguments, and registration output is suppressed. The helper refuses duplicate registration, uses the Docker executor without privileged mode or a host socket mount in job containers, and verifies registration. Run a real smoke-test job covering clone, registry, DNS, cache and artifact upload. Container image builds require an explicit build strategy; Docker-in-Docker is not configured.
 
-Run a real GitLab job with the intended tags. Registration verification does not prove container execution, source cloning, cache access, DNS or artifact upload. This image does not configure Docker-in-Docker; jobs needing to build container images require an explicit build strategy.
+## References
 
-## Vendor references
-
-- [Microsoft Linux installation and onboarding](https://learn.microsoft.com/en-us/defender-endpoint/linux-install-manually)
-- [Microsoft Linux golden-image support](https://learn.microsoft.com/en-us/defender-endpoint/linux-deploy-defender-for-endpoint-using-golden-images)
+- [Microsoft Linux onboarding](https://learn.microsoft.com/en-us/defender-endpoint/linux-install-manually)
 - [Datadog Linux Agent](https://docs.datadoghq.com/agent/supported_platforms/linux/)
-- [GitLab runner registration](https://docs.gitlab.com/runner/register/)
+- [GitLab registration](https://docs.gitlab.com/runner/register/)

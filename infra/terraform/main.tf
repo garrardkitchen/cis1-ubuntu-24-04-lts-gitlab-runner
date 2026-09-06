@@ -64,13 +64,12 @@ resource "azurerm_user_assigned_identity" "builder" {
   tags                = var.tags
 }
 resource "azurerm_federated_identity_credential" "gitlab" {
-  count               = var.gitlab_federation == null ? 0 : 1
-  name                = "gitlab-image-build"
-  resource_group_name = azurerm_resource_group.build.name
-  parent_id           = azurerm_user_assigned_identity.builder.id
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = var.gitlab_federation.issuer
-  subject             = var.gitlab_federation.subject
+  count                     = var.gitlab_federation == null ? 0 : 1
+  name                      = "gitlab-image-build"
+  user_assigned_identity_id = azurerm_user_assigned_identity.builder.id
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = var.gitlab_federation.issuer
+  subject                   = var.gitlab_federation.subject
 }
 
 resource "azurerm_role_assignment" "build" {

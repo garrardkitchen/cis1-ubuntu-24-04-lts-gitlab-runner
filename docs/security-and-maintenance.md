@@ -4,7 +4,7 @@
 
 Confirm the selected CIS SKU and purchase plan in the target region. The default is Level 1, Gen2, x64. Trusted Launch support is not inferred from Gen2 and is not enabled by this scaffold; adopt it only after validating the source, destination definition and workload requirements together.
 
-The Packer host must reach the private build VM over SSH. Keep SSH and passwordless build-user sudo available during provisioning. The template reads temporary scripts with `/bin/sh` and runs the C# executable from `/opt`; it does not remount `/tmp` or remove CIS `noexec` controls. An executable filesystem is required at `/opt`. A CIS configuration that blocks this build path needs a specific reviewed adjustment, followed by reassessment.
+The Packer host must reach the private build VM over SSH. Keep SSH and passwordless build-user sudo available during provisioning. The template reads temporary scripts with `/bin/sh` and reads the provisioning scripts with `/bin/bash` from `/opt/image-factory`; it does not remount `/tmp` or remove CIS `noexec` controls. A CIS configuration that blocks this build path needs a specific reviewed adjustment, followed by reassessment.
 
 The build subnet needs DNS, Ubuntu repositories and HTTPS access to Docker, GitLab package delivery, Datadog keys/APT and Microsoft packages, including vendor redirects/CDNs. Production VMs also need their vendor service endpoints and GitLab/container registry. Use the official endpoint lists, not only the root package hostnames.
 
@@ -32,7 +32,7 @@ Do not grant untrusted jobs access to the image-build runner or identity. Docker
 
 ## Patching and repeatability
 
-Rebuild for source, application package and embedded .NET runtime updates. Resolve a new source explicitly, review it, build, assess and promote. Updating a gallery image does not patch already deployed VMs; roll them forward or use your existing in-place patching process.
+Rebuild for source and application package updates. Resolve a new source explicitly, review it, build, assess and promote. Updating a gallery image does not patch already deployed VMs; roll them forward or use your existing in-place patching process.
 
 Package pins and recorded inventory improve traceability but are not a full repository snapshot. Keep package mirrors/snapshots if deterministic long-term rebuilds are required. `apt upgrade` retains existing configuration files; review newly introduced package defaults and pending reboot effects on a candidate VM.
 

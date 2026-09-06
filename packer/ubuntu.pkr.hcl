@@ -67,13 +67,12 @@ build {
   }
   provisioner "shell" {
     execute_command = "sudo /bin/sh -eu '{{ .Path }}'"
-    inline          = [
+    inline = [
       "install -d -m 0755 /opt/image-factory",
       "cp -a /home/packer/image-factory-upload/. /opt/image-factory/",
       "chown -R root:root /opt/image-factory",
       "chmod -R go-w /opt/image-factory",
-      "chmod 0755 /opt/image-factory/ImageProvisioner",
-      "/opt/image-factory/ImageProvisioner install /home/packer/package-pins.json"
+      "/bin/bash /opt/image-factory/install.sh /home/packer/package-pins.json"
     ]
   }
   provisioner "file" {
@@ -88,11 +87,11 @@ build {
   }
   provisioner "shell" {
     execute_command = "sudo /bin/sh -eu '{{ .Path }}'"
-    inline          = ["/opt/image-factory/ImageProvisioner seal"]
+    inline          = ["/bin/bash /opt/image-factory/seal.sh"]
   }
   post-processor "manifest" {
-    output      = "artifacts/packer-manifest.json"
-    strip_path  = true
+    output     = "artifacts/packer-manifest.json"
+    strip_path = true
     custom_data = {
       source_sku     = var.source_image_sku
       source_version = var.source_image_version
